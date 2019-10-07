@@ -33,13 +33,13 @@ void loop() {
 /// RTC and GPS not updated after leaving standby mode
 /// Sometimes GPS and RTC not updated in warmup after reset
 
-  EFU.AcquireGPS();
-  //EFU.TimeManager();
-  if(testcounter-testlastcount>=5000){
-    EFU.TimeManager();
-    testlastcount = millis(); 
-  }
-  testcounter = millis();
+  //EFU.AcquireGPS();
+  EFU.TimeManager();
+  // if(testcounter-testlastcount>=5000){
+  //   EFU.TimeManager();
+  //   testlastcount = millis(); 
+  // }
+  // testcounter = millis();
 
   
       

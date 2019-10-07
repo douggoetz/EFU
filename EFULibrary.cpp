@@ -68,11 +68,20 @@ CircularBuffer<int,TXBUFSIZE> txbuf;
 byte PowerSaveMode[] = {0xB5, 0x62, 0x06, 0x11, 0x02, 0x00, 0x48, 0x01, 0x62, 0x12};
 byte CyclicTracking[] = {0xB5, 0x62, 0x06, 0x3B, 0x30, 0x00, 0x02, 0x06, 0x00, 0x00, 0x00, 0x10, 0x4, 0x01, 0xE8,0x03, 0x00, 0x00, 0x10, 0x27, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2C, 0x01, 0x00, 0x00, 0x4F, 0xC1, 0x03, 0x00, 0x86, 0x02, 0x00, 0x00, 0xFE, 0x00, 0x00, 0x00, 0x64, 0x40, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59, 0x02};
 byte GNSSConfig[] = {0xB5, 0x62, 0x06, 0x3E, 0x3C, 0x00, 0x00, 0x00, 0x20, 0x07, 0x00, 0x08, 0x10, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x03, 0x00, 0x00, 0x00, 0x01, 0x01, 0x02, 0x04, 0x08, 0x00, 0x00, 0x00, 0x01, 0x01, 0x03, 0x08, 0x10, 0x00, 0x00, 0x00, 0x01, 0x01, 0x04, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x01, 0x05, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x01, 0x06, 0x08, 0x0E, 0x00, 0x00, 0x00, 0x01, 0x01, 0x2C, 0x4D}; 
-byte SaveConfig[] = {0xB5, 0x62, 0x06, 0x09, 0x0D, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x1B, 0xA9};
+byte SaveUBLOXConfig[] = {0xB5, 0x62, 0x06, 0x09, 0x0D, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x1B, 0xA9};
 byte GNGGL_off[] = {0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2A};
 byte GNGSA_off[] = {0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x31};
 byte GNGSV_off[] = {0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x38};
 byte GNVTG_off[] = {0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x46};
+byte UBX_Set_Airborne[] = {0xB5, 0x62, 0x06, 0x24, 0x24, 0x00, 
+                              0x05, 0x00, // mask (only update dyn model and fix mode)
+	                          0x7, // dynamic model = airborne <2g
+	                          0x3, // fix mode = 2D/3D
+	                          0x0, 0x0, 0x0, 0x0, 0x10, 0x27, 0x00, 0x00, 0x05, 0x00, 
+	                          0xFA, 0x00, 0xFA, 0x00, 0x64, 0x00, 0x2C, 0x01, 0x00, 
+	                          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	                          0x00, 0x00, 0x00, 0x00, 0x00, 0x1e, 0xf9}; // 0x1d, 0xd8 for 0x2 fix mode
+
 
 //RTC setup
 byte seconds = 0;
@@ -112,8 +121,8 @@ float vBatt;
 float vSolar;
 
 // Timing variables
-int StartupPeriod = 30000; //30s between loops to monitor/control temperature and monitor voltage 
-int WarmupPeriod = 1000; // 1Hz loops to get GPS lock and set RTC
+int StartupInterval = 30000; //30s between loops to monitor/control temperature and monitor voltage 
+int WarmupInterval = 1000; // 1Hz loops to get GPS lock and set RTC
 int StandbyInterval = 100; // millis until next loop
 int MeasureInterval = 2000; // 0.5Hz loops to get measurements of temperature, voltage, and GPS location
 int TelemInterval = 1000; //1 Hz loops to send telemetry to the DIB
@@ -123,15 +132,6 @@ int MeasurePeriod = 1; //number of minutes to make 0.5hz measurements (to stay i
 int TelemPeriod = 1; //number of minutes to send telemetry to the DIB
 int TelemStartMin = 59; //minute to interrupt out of warmup, standby, and meausurement mode and go into telemetry mode 
 int startminute;
-
-int LastDay = 1;
-int LastHour = 0;
-int LastMin = 0;
-int LastAquire = 0;
-int LastSleep = 0;
-int TxMinute = 18;
-int MeasurementPeriod = 10000;
-int AveragingMinutes = 2;
 
 //Moving Average Values
 float vIn_Avg;
@@ -185,81 +185,67 @@ void EFULibrary::ManageState() {
       //turn solar charger on, monitor/control temperature until V_batt is good
       SolarOn();
       ChargerOn();
-      //HeaterControl(ChargeSetTemp, TempSpan);
+      HeaterControl(ChargeSetTemp, TempSpan);
       ReadAnalogChannels();
 
-
+      if(BATT_V < 0 || BATT_V > 4.5){ //if there is a bad ADC reading reset EFU
+        ResetConfiguration();
+        SerialUSB.println("Bad ADC reading in startup")
+        BATT_V = 0; // change to zero to restart switch-case by not entering if statment below
+      }
+      
       if(BATT_V>=ChargeVLimit){  
         inst_state = WARMUP; //next state to go into
-        measure_state = STANDBY; // state to go into after warmup
+        //measure_state = STANDBY; //go into stanby state if any sleep mode is needed
+        measure_state = MEASURE; // go straight into measurement state after warmup
         enterstate = true;
         RTCupdate = false;
         SerialUSB.println("Exit Startup Mode");
       }
-
+      
       break;
 
     case WARMUP:
 
-      if(TestState){
+      if(TestState){ //used if GPS isn't available during testing
 
-        //GPSon();
-        //sendGPSconfig();
-        //delay(100);
-        enterstate = false;
-        //rtc.setTime(hours,minutes,seconds); 
-        //rtc.setDate(day, month, year);
-        //printRTC();
-
-        switch (measure_state) {
-
-        case MEASURE: //go into measure mode after warmup
-          inst_state = MEASURE;
-          SerialUSB.println(measure_state);
-          SerialUSB.println("Exit warmup and go into measurement");
-          startminute = rtc.getMinutes();
-          break;
-
-        case STANDBY: // go into standby mode after warmup
-          inst_state = STANDBY;
-          startminute = rtc.getMinutes();
-          SerialUSB.println(measure_state);
-          SerialUSB.println("Exit warmup and go into standby");
-          break;
-
-        default:
-          inst_state = WARMUP; //REDO warmup mode because of old RTC set
-          break;
-        }
-
-        break;  
-
-      }
-      if(enterstate){
-        SerialUSB.println("Enter Warmup");
         GPSon();
         sendGPSconfig();
         delay(100);
         enterstate = false;
+        rtc.setTime(hours,minutes,seconds); 
+        rtc.setDate(day, month, year);
+    
+        inst_state = MEASURE;
+        SerialUSB.println(measure_state);
+        SerialUSB.println("Exit warmup and go into measurement");
+        startminute = rtc.getMinutes();
+        break;
 
       }
-      //start GPS
+
+      if(enterstate){ //when first going into WARMUP turn on/configure GPS
+        SerialUSB.println("Enter Warmup");
+        GPSon();
+        sendGPSconfig();
+        delay(100);
+        enterstate = false; 
+      }
+
+      //Acquire NMEA strings
       AcquireGPS();
       SerialUSB.println("GPS Acquire loop");
 
-      if(GPS.fixquality == 1 && RTCupdate == false){ //get gps time
-        rtc.setTime(hours,minutes,seconds);  
-        rtc.setDate(day, month, year);
+      if(GPS.fixquality == 1 && RTCupdate == false){ //if there is a GPS fix and the RTC needs to be updated
 
-        //rtc.setTime(GPS.hour,GPS.minute,GPS.seconds); 
-        //rtc.setDate(GPS.day, GPS.month, GPS.year);  //set RTC
-        
+        rtc.setTime(GPS.hour,GPS.minute,GPS.seconds); 
+        rtc.setDate(GPS.day, GPS.month, GPS.year);  //set RTC
         printRTC();
         RTCupdate = true; // starts RTC update cycle
-        //SerialUSB.println("Set RTC");
+        SerialUSB.println("Set RTC");
       }
 
-      if(RTCupdate){  // go into standby or measure depending on flag
+      if(RTCupdate){  // if the RTC has been updated go into MEASURE or STANDBY state
         switch (measure_state) {
 
         case MEASURE: //go into measure mode after warmup
@@ -288,6 +274,8 @@ void EFULibrary::ManageState() {
     case STANDBY:
       
       SerialUSB.println("In Standby");
+
+      ////// Standby to be reserved for if a "Low Power" mode is needed ///////
       
       //AcquireGPS();
       //HeaterControl(ChargeSetTemp, TempSpan);  //monitor/control heater
@@ -331,13 +319,16 @@ void EFULibrary::ManageState() {
     case MEASURE:
 
       HeaterControl(ChargeSetTemp, TempSpan);  //monitor/control heater
+      AcquireGPS();
+      ReadAnalogChannels();
+      AcquireTempC();
+      
       //to do:
       //set/control time for measurement/averaging/telemetry
       break;
 
     case TELEMETRY:
 
-      HeaterControl(ChargeSetTemp, TempSpan); 
       GPSoff();
       FiberTXOn();
       //to do: send telemetry
@@ -360,35 +351,31 @@ void EFULibrary::TimeManager(){
   
   case STARTUP:
 
-    if(counter-lastcount >= StartupPeriod){
+    if(counter-lastcount >= StartupInterval){
       ManageState();
       lastcount = millis();
-      printRTC();
     }
     break;
   
   case WARMUP:
 
-    if(rtc.getMinutes()==TelemStartMin){ 
+    if(rtc.getMinutes()==TelemStartMin){ // Send to telemetry state if within telemetry window minute
       inst_state = TELEMETRY;
-      printRTC();
       break;
     }
 
-    if(counter-lastcount >= WarmupPeriod){
+    if(counter-lastcount >= WarmupInterval){
       ManageState();
-      printRTC();
       lastcount = millis();
     }  
     break;
   
   case STANDBY:
     
-    // if(rtc.getMinutes()==TelemStartMin){ // Send to telemetry state if within telemetry window minute
-    //   inst_state = TELEMETRY;
-    //   printRTC();
-    //   break;
-    // }
+    if(rtc.getMinutes()==TelemStartMin){ // Send to telemetry state if within telemetry window minute
+      inst_state = TELEMETRY;
+      break;
+    }
     
     // if(rtc.getMinutes()-startminute!=0&&((rtc.getMinutes()+60)-startminute)%StandbyPeriod == 0){ // Send to warmup state when Standby period is over
     //   inst_state = WARMUP;
@@ -399,16 +386,8 @@ void EFULibrary::TimeManager(){
     //   break;
     // }
 
-    if(counter-lastcount >= StandbyInterval){ // Maintain temperature at Standby interval
+    if(counter-lastcount >= StandbyInterval){ // Maintain temperature or other settings at Standby interval
       ManageState();
-      //printRTC();
-      //SerialUSB.println(GPS.latitude_fixed);
-      //SerialUSB.println(rtc.getMinutes()+60);
-      //SerialUSB.println(startminute);
-      //SerialUSB.println(StandbyPeriod);
-      //SerialUSB.println((rtc.getMinutes()+60)-startminute);
-      //SerialUSB.println(((rtc.getMinutes()+60)-startminute)%StandbyPeriod);
-      //SerialUSB.println(rtc.getMinutes()-startminute);
       lastcount = millis();   
     }
     break;
@@ -417,37 +396,33 @@ void EFULibrary::TimeManager(){
 
     if(rtc.getMinutes()==TelemStartMin){ // Send to telemetry state if within telemetry window minute
       inst_state = TELEMETRY;
-      printRTC();
       break;
     }
 
-    if(rtc.getMinutes()-startminute!=0 && ((rtc.getMinutes()+60)-startminute)%MeasurePeriod == 0){ // Send to warmup state when Standby period is over
-      inst_state = WARMUP;
-      enterstate = true;
-      measure_state = STANDBY;
-      RTCupdate = false;
-      printRTC();
-      break;
+    if(rtc.getMinutes()-startminute!=0 && ((rtc.getMinutes()+60)-startminute)%MeasurePeriod == 0){ 
+      
+      //to do: put averaging function here
+
     }
 
-    if(counter-lastcount >= MeasureInterval){ // Maintain temperature at Standby interval
+    if(counter-lastcount >= MeasureInterval){
       ManageState();
-      printRTC();
       lastcount = millis();   
     }
     break;
   
   case TELEMETRY:
     
-    if(rtc.getMinutes()%TelemPeriod == 0){ // Send to warmup state when Standby period is over
-      inst_state = WARMUP;
-      printRTC();
+    if(rtc.getMinutes()%TelemPeriod == 0){ // Send to warmup state when telemetry period is over
+      inst_state = WARMUP; // when telemetry period is over go into warmup state
+      enterstate = true; //set enterstate = true to turn on and configure GPS
+      measure_state = MEASURE; //goes into measurement state after warmup
+      RTCupdate = false; //used to reset RTC with GPS time
       break;
     }
 
     if(counter-lastcount >= TelemInterval){ // Maintain temperature at Standby interval
       ManageState();
-      printRTC();
       lastcount = millis();   
     }
     break;
@@ -472,20 +447,20 @@ void EFULibrary::ResetConfiguration(){
 
   
   rtc.begin(); 
-  rtc.setTime(hours,minutes,seconds);
+  //rtc.setTime(hours,minutes,seconds);
   delay(100);
   
   //GPS pins
 	pinMode(GPS_Power, OUTPUT); //digitalwrite high to turn on
-  //GPSoff();
-  GPSon(); //for testing
-  delay(100);
-  sendGPSconfig(); //for testing
+  GPSoff();
+  //GPSon(); //for testing
+  //delay(100);
+  //sendGPSconfig(); //for testing
 
   //Fiber TX DIO
 	pinMode(FiberPower, OUTPUT); //digitalwrite high to turn on
-  FiberTXOn();
-  //FiberTXOff();
+  //FiberTXOn();
+  FiberTXOff();
 
 
 	//LTC Temperature IC Pins
@@ -516,10 +491,10 @@ void EFULibrary::ResetConfiguration(){
 
   inst_state = STARTUP;
   StartupConfig = true; 
-  measure_state = STANDBY;
+  //measure_state = STANDBY; // to use if "low power" mode is needed
+  measure_state = MEASURE;
   RTCupdate = false;
     		
-  
   counter = millis();
   lastcount = millis();
 
@@ -639,7 +614,6 @@ float EFULibrary::MeasureLTC2983(int channel){
    return temp;
 } 
 
-
 float EFULibrary::MeasureLTC2983_V(int channel){
    float temp;
     temp =  measure_channel(CHIP_SELECT, channel, VOLTAGE);
@@ -668,29 +642,33 @@ void EFULibrary::GPSoff(){
 }
 
 void EFULibrary::sendGPSconfig(){
-    GPSSerial.write(PowerSaveMode, 10);
+    GPSSerial.write(PowerSaveMode, sizeof(PowerSaveMode));
     GPSSerial.flush();
- 
-    GPSSerial.write(CyclicTracking,56);
+
+    GPSSerial.write(CyclicTracking,sizeof(CyclicTracking));
+    //GPSSerial.write(CyclicTracking,56);
     GPSSerial.flush();
 
    //GPSSerial.write(GNSSConfig, 68); //command GPS to use GPS satellites only for reduce power consumption
    //GPSSerial.flush();
     
-    GPSSerial.write(GNGGL_off,16);
+    GPSSerial.write(GNGGL_off,sizeof(GNGGL_off));
     GPSSerial.flush();
     
-    GPSSerial.write(GNGSA_off,16);
+    GPSSerial.write(GNGSA_off,sizeof(GNGSA_off));
     GPSSerial.flush();
 
-    GPSSerial.write(GNGSV_off,16);
+    GPSSerial.write(GNGSV_off, sizeof(GNGSV_off));
     GPSSerial.flush();
     
-    GPSSerial.write(GNVTG_off,16);
+    GPSSerial.write(GNVTG_off, sizeof(GNVTG_off));
     GPSSerial.flush();
 
-  //  GPSSerial.write(SaveConfig, 21); //save all GPS settings w/ battery backed ram
-  //  GPSSerial.flush();
+    GPSSerial.write(UBX_Set_Airborne, sizeof(UBX_Set_Airborne));
+    GPSSerial.flush();
+
+    GPSSerial.write(SaveUBLOXConfig, sizeof(SaveUBLOXConfig)); //save all GPS settings w/ battery backed ram
+    GPSSerial.flush();
 }
 
 void EFULibrary::AcquireGPS(){
@@ -768,8 +746,6 @@ void EFULibrary::printRTC(){
 
 }
        
-
-
 void EFULibrary::AcquireTempC(){
 
 	  FibPRT1_T = MeasureLTC2983(16); 
@@ -779,7 +755,6 @@ void EFULibrary::AcquireTempC(){
     Batt_Therm_T = MeasureLTC2983(4); 
 
 } 
-
 
 void EFULibrary::AcquireRTDVoltages(){
 

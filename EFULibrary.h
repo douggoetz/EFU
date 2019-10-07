@@ -35,7 +35,7 @@ class EFULibrary
     EFULibrary(int pin);
     void ManageState(); //Switch-case that uses the EFUState enum for a state machine
     void ResetConfiguration(); //Sets safe configuration for startup and watchdog reset
-    void TimeManager();
+    void TimeManager(); //Swith-case that uses the EFUState enum to determine what timer should be used to switch states and perform routine operations
     
     //Control Heater based on battery temperature
     void HeaterControl(int setT, int setTspan);
