@@ -16,7 +16,7 @@ enum EFUState: uint8_t {
 /////////// State machine Variables ///////////
 uint8_t inst_state;
 uint8_t measure_state;
-bool TestState = false; //if 0 then run normally, if 1 then ignore GPS fix
+bool TestState = true; //if 0 then run normally, if 1 then ignore GPS fix
 
 String DataStr = "";
 String TimeStr = "";
@@ -124,7 +124,7 @@ float vSolar;
 int StartupInterval = 30000; //30s between loops to monitor/control temperature and monitor voltage 
 int WarmupInterval = 1000; // 1Hz loops to get GPS lock and set RTC
 int StandbyInterval = 100; // millis until next loop
-int MeasureInterval = 2000; // 0.5Hz loops to get measurements of temperature, voltage, and GPS location
+int MeasureInterval = 10000; // 0.5Hz loops to get measurements of temperature, voltage, and GPS location
 int TelemInterval = 1000; //1 Hz loops to send telemetry to the DIB
 
 int StandbyPeriod = 5; //number of minutes until next warmup/measurement period
@@ -157,6 +157,7 @@ bool StartupConfig = false;
 bool enterstate = true;
 bool RTCupdate = false;
 int BattHeaterState;
+bool BattVError = false;
 
 
 //Operational thresholds
@@ -190,16 +191,17 @@ void EFULibrary::ManageState() {
 
       if(BATT_V < 0 || BATT_V > 4.5){ //if there is a bad ADC reading reset EFU
         ResetConfiguration();
-        SerialUSB.println("Bad ADC reading in startup")
-        BATT_V = 0; // change to zero to restart switch-case by not entering if statment below
+        SerialUSB.println("Bad ADC reading in startup");
+        BattVError = 1; // change to zero to restart switch-case by not entering if statment below
       }
       
-      if(BATT_V>=ChargeVLimit){  
+      if(BattVError){  
         inst_state = WARMUP; //next state to go into
         //measure_state = STANDBY; //go into stanby state if any sleep mode is needed
         measure_state = MEASURE; // go straight into measurement state after warmup
         enterstate = true;
         RTCupdate = false;
+        BattVError = 0;
         SerialUSB.println("Exit Startup Mode");
       }
       
@@ -322,6 +324,23 @@ void EFULibrary::ManageState() {
       AcquireGPS();
       ReadAnalogChannels();
       AcquireTempC();
+
+      if(TestState){
+        FiberTXOn();
+        //AcquireRTDVoltages();
+        delay(10);
+
+        FibSerial.flush();
+        TimeStr = (String(rtc.getYear())+String(rtc.getMonth())+String(rtc.getDay())+","+String(rtc.getHours())+":"+String(rtc.getMinutes())+":"+String(rtc.getSeconds())+",");
+       // GPSStr = (String(GPS.year)+String(GPS.month)+String(GPS.day)+","+String(GPS.hour)+":"+String(GPS.minute)+":"+String(GPS.seconds)+","+String(GPS.latitude_fixed)+","+String(GPS.longitude_fixed)+","+String(GPS.altitude)+",");
+        TempStr = (String(BattHeaterState)+","+String(FibPRT1_T)+","+String(FibPRT2_T)+","+String(OAT_T)+","+String(PWD_Therm_T)+","+String(Batt_Therm_T)+",");
+        AnalogStr = (String(vBatt)+","+String(vIn));
+
+        //FibSerial.print(TimeStr+GPSStr+TempStr+AnalogStr+'\r');
+        FibSerial.print(TimeStr+TempStr+AnalogStr+'\r');
+        FibSerial.println("");
+    
+      }
       
       //to do:
       //set/control time for measurement/averaging/telemetry
@@ -549,12 +568,16 @@ void EFULibrary::ConfigureChannels(){
   assign_channel(CHIP_SELECT, 2, channel_assignment_data);
   // ----- Channel 4: Assign Thermistor 44006 10K@25C -----
   channel_assignment_data = 
-    SENSOR_TYPE__THERMISTOR_44006_10K_25C |
+    //SENSOR_TYPE__THERMISTOR_44006_10K_25C |
+    SENSOR_TYPE__THERMISTOR_CUSTOM_STEINHART_HART |
     THERMISTOR_RSENSE_CHANNEL__2 |
     THERMISTOR_DIFFERENTIAL |
     THERMISTOR_EXCITATION_MODE__SHARING_NO_ROTATION |
-    THERMISTOR_EXCITATION_CURRENT__AUTORANGE;
+    THERMISTOR_EXCITATION_CURRENT__1UA|
+    (uint32_t) 0x1E << THERMISTOR_CUSTOM_ADDRESS_LSB; //Custom thermistor at address: 30
+    //THERMISTOR_EXCITATION_CURRENT__AUTORANGE;
   assign_channel(CHIP_SELECT, 4, channel_assignment_data);
+
   // ----- Channel 6: Assign Thermistor 44006 10K@25C -----
   channel_assignment_data = 
     SENSOR_TYPE__THERMISTOR_44006_10K_25C |
@@ -607,6 +630,30 @@ void EFULibrary::configure_global_parameters(){
   
 
 }
+
+void EFULibrary::configure_memory_table()
+{
+    uint16_t start_address;
+    
+    //Configurations generated using Analog Devices LTC2983 Windows Demo Program
+    
+    //Configuration for NTCLE413E2103F102L
+    // From: http://www.vishay.com/docs/29078/ntcle413.pdf
+    
+    uint32_t NTCLE413E2103F102L_steinhart_hart_coefficients[] =
+    {
+        979823667,  // -- For coefficient 0.0008809000137262046
+        964985049,  // -- For coefficient 0.00025273000937886536
+        0,  // -- For coefficient 0.0
+        877110214,  // -- For coefficient 1.8592899664326978e-07
+        0,  // -- For coefficient 0.0
+        0   // -- For coefficient 0.0
+    };
+    start_address = 772;    // Real address = 6*30 + 0x250 = 772
+    write_custom_steinhart_hart(CHIP_SELECT, NTCLE413E2103F102L_steinhart_hart_coefficients, start_address);
+    
+}
+
 
 float EFULibrary::MeasureLTC2983(int channel){
    float temp;

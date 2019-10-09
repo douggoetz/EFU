@@ -43,6 +43,7 @@ class EFULibrary
     //LTC Temperature measurement 
     void ConfigureChannels(); //Configure LTC2983 Channel settings
     void configure_global_parameters(); //configures globals for LTC chip
+    void configure_memory_table();
     float MeasureLTC2983(int channel);//returns the temperature of a given channel in degrees C.
     float MeasureLTC2983_V(int channel);//returns the temperature of a given channel in degrees C.
     void LTC_sleep(); //used to put LTC in low power sleep mode.

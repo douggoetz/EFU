@@ -63,8 +63,8 @@ ongoing work.
 
 //void print_title();
 void assign_channel(uint8_t chip_select, uint8_t channel_number, uint32_t channel_assignment_data);
-//void write_custom_table(uint8_t chip_select, struct table_coeffs coefficients[64], uint16_t start_address, uint8_t table_length);
-//void write_custom_steinhart_hart(uint8_t chip_select, uint32_t steinhart_hart_coeffs[6], uint16_t start_address);
+void write_custom_table(uint8_t chip_select, struct table_coeffs coefficients[64], uint16_t start_address, uint8_t table_length);
+void write_custom_steinhart_hart(uint8_t chip_select, uint32_t steinhart_hart_coeffs[6], uint16_t start_address);
 
 float measure_channel(uint8_t chip_select, uint8_t channel_number, uint8_t channel_output);
 void convert_channel(uint8_t chip_select, uint8_t channel_number);
